@@ -174,3 +174,11 @@ evaluation
 tools
 BACKUP
 exps
+
+output*
+multi_layer_gen/output*
+multi_layer_gen/pretrained*
+test_semi.ipynb
+
+# not ignore the following files
+!assets/teaser.png
