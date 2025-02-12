@@ -1,0 +1,16 @@
+accelerate==0.27.2
+click>=8.0.4,<9
+datasets>=2.10.0,<3
+transformers==4.39.1
+langchain>=0.0.139
+wandb
+ninja
+tensorboard
+tensorboardx
+peft @ git+https://github.com/huggingface/peft.git@382b178911edff38c1ff619bbac2ba556bd2276b
+webdataset
+tiktoken
+einops
+bitsandbytes
+evaluate
+bert_score
