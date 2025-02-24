@@ -182,3 +182,5 @@ test_semi.ipynb
 
 # not ignore the following files
 !assets/teaser.png
+!assets/natural_image_data/*/*.png
+!assets/semi_transparent_image_data/*/*.png
