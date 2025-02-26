@@ -56,6 +56,12 @@ pip install wandb==0.17.7 einops==0.8.0 sentencepiece==0.2.0 mmengine==0.10.4 pr
 huggingface-cli login
 ```
 
+### Quick Start
+Use example.py to simply have a try:
+```
+python example.py
+```
+
 ### Testing Multi-Layer-Generation
 
 #### 1. Download Checkpoints
