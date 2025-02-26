@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Any, Dict, List, Optional, Union, Tuple
 
+from accelerate.utils import set_module_tensor_to_device
 from diffusers.models.modeling_outputs import Transformer2DModelOutput
 from diffusers.models.normalization import AdaLayerNormContinuous
 from diffusers.models.embeddings import CombinedTimestepGuidanceTextProjEmbeddings, CombinedTimestepTextProjEmbeddings, FluxPosEmbed
@@ -45,7 +46,7 @@ class CustomFluxTransformer2DModel(FluxTransformer2DModel):
         pooled_projection_dim: int = 768,
         guidance_embeds: bool = False,
         axes_dims_rope: Tuple[int] = (16, 56, 56),
-        max_layer_num: int = 10,
+        max_layer_num: int = 52,
     ):
         super(FluxTransformer2DModel, self).__init__()
         self.out_channels = in_channels
@@ -91,8 +92,32 @@ class CustomFluxTransformer2DModel(FluxTransformer2DModel):
         self.gradient_checkpointing = False
 
         self.max_layer_num = max_layer_num
-        self.layer_pe = nn.Parameter(torch.empty(1, self.max_layer_num, 1, 1, self.inner_dim))
-        nn.init.trunc_normal_(self.layer_pe, mean=0.0, std=0.02, a=-2.0, b=2.0)
+
+        # the following process ensures self.layer_pe is not created as a meta tensor
+        layer_pe_value = nn.init.trunc_normal_(
+            nn.Parameter(torch.zeros(
+                1, self.max_layer_num, 1, 1, self.inner_dim,
+            )),
+            mean=0.0, std=0.02, a=-2.0, b=2.0,
+        ).data.detach()
+        self.layer_pe = nn.Parameter(layer_pe_value)
+        set_module_tensor_to_device(
+            self, 
+            'layer_pe', 
+            device='cpu',
+            value=layer_pe_value,
+            dtype=layer_pe_value.dtype,
+        )
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwarg):
+        model = super().from_pretrained(*args, **kwarg)
+        for name, para in model.named_parameters():
+            if name != 'layer_pe':
+                device = para.device
+                break
+        model.layer_pe.to(device)
+        return model
 
     def crop_each_layer(self, hidden_states, list_layer_box):
         """

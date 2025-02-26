@@ -8,7 +8,11 @@ import torch.nn as nn
 import torchvision
 from torch.utils.checkpoint import checkpoint
 
+from accelerate.utils import set_module_tensor_to_device
 from diffusers.models.embeddings import apply_rotary_emb, FluxPosEmbed
+from diffusers.models.modeling_utils import ModelMixin
+from diffusers.configuration_utils import ConfigMixin
+from diffusers.loaders import FromOriginalModelMixin
 
 
 class MLPBlock(torchvision.ops.misc.MLP):
@@ -247,7 +251,7 @@ def prepare_latent_image_ids(batch_size, height, width, device, dtype):
     return latent_image_ids.to(device=device, dtype=dtype)
 
 
-class AutoencoderKLTransformerTraining(nn.Module):
+class AutoencoderKLTransformerTraining(ModelMixin, ConfigMixin, FromOriginalModelMixin):
     def __init__(self):
         super().__init__()
 
@@ -255,7 +259,6 @@ class AutoencoderKLTransformerTraining(nn.Module):
         self.layer_embedding = 'rope'
 
         self.decoder = ViTEncoder()
-        self.decoder.requires_grad_(True)
         self.pos_embedding = FluxPosEmbed(theta=10000, axes_dim=(8, 28, 28))
         if 'rel' in self.layer_embedding or 'abs' in self.layer_embedding:
             self.layer_embedding = nn.Parameter(torch.empty(16, 2 + self.max_layers, 1, 1).normal_(std=0.02), requires_grad=True)
