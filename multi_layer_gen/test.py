@@ -73,6 +73,7 @@ def parse_config(path=None):
 
 def initialize_pipeline(config, args):
 
+    # Load the original Transformer model from the pretrained model
     transformer_orig = FluxTransformer2DModel.from_pretrained(
         config.transformer_varient if hasattr(config, "transformer_varient") else config.pretrained_model_name_or_path, 
         subfolder="" if hasattr(config, "transformer_varient") else "transformer", 
@@ -81,6 +82,8 @@ def initialize_pipeline(config, args):
         torch_dtype=torch.bfloat16,
         cache_dir=config.get("cache_dir", None),
     )
+    
+    # Configure the custom Transformer model
     mmdit_config = dict(transformer_orig.config)
     mmdit_config["_class_name"] = "CustomSD3Transformer2DModel"
     mmdit_config["max_layer_num"] = config.max_layer_num
@@ -88,18 +91,19 @@ def initialize_pipeline(config, args):
     transformer = CustomFluxTransformer2DModel.from_config(mmdit_config).to(dtype=torch.bfloat16)
     missing_keys, unexpected_keys = transformer.load_state_dict(transformer_orig.state_dict(), strict=False)
 
-    # lora pretrained lora weights
-    if hasattr(config, "pretrained_lora_dir"):
-        lora_state_dict = CustomFluxPipelineCfg.lora_state_dict(config.pretrained_lora_dir)
+    # Fuse initial LoRA weights
+    if args.pre_fuse_lora_dir is not None:
+        lora_state_dict = CustomFluxPipelineCfg.lora_state_dict(args.pre_fuse_lora_dir)
         CustomFluxPipelineCfg.load_lora_into_transformer(lora_state_dict, None, transformer)
         transformer.fuse_lora(safe_fusing=True)
-        transformer.unload_lora() # don't forget to unload the lora params
+        transformer.unload_lora() # Unload LoRA parameters
 
-    # load layer_pe
+    # Load layer_pe weights
     layer_pe_path = os.path.join(args.ckpt_dir, "layer_pe.pth")
     layer_pe = torch.load(layer_pe_path)
     missing_keys, unexpected_keys = transformer.load_state_dict(layer_pe, strict=False)
 
+    # Initialize the custom pipeline
     pipeline_type = CustomFluxPipelineCfg
     pipeline = pipeline_type.from_pretrained(
         config.pretrained_model_name_or_path,
@@ -109,23 +113,18 @@ def initialize_pipeline(config, args):
         torch_dtype=torch.bfloat16,
         cache_dir=config.get("cache_dir", None),
     ).to(torch.device("cuda", index=args.gpu_id))
-    pipeline.enable_model_cpu_offload(gpu_id=args.gpu_id) # save vram
+    pipeline.enable_model_cpu_offload(gpu_id=args.gpu_id) # Save GPU memory
 
+    # Load LoRA weights
     pipeline.load_lora_weights(args.ckpt_dir, adapter_name="layer")
 
-    _SET_ADAPTER_SCALE_FN_MAPPING["CustomFluxTransformer2DModel"] = _SET_ADAPTER_SCALE_FN_MAPPING["FluxTransformer2DModel"]
-
-    lora_info = {"url": args.fuse_lora_dir}
-    if "weight_name" in lora_info:
-        pipeline.load_lora_weights(lora_info["url"], weight_name=lora_info["weight_name"], adapter_name="pretrained_lora")
-    else:
-        pipeline.load_lora_weights(lora_info["url"], adapter_name="pretrained_lora")
-    
-    adapter_names = ["layer", "pretrained_lora"]
-    pipeline.set_adapters(adapter_names, adapter_weights=[1.0]*len(adapter_names))
+    # Load additional LoRA weights
+    if args.extra_lora_dir is not None:
+        _SET_ADAPTER_SCALE_FN_MAPPING["CustomFluxTransformer2DModel"] = _SET_ADAPTER_SCALE_FN_MAPPING["FluxTransformer2DModel"]
+        pipeline.load_lora_weights(args.extra_lora_dir, adapter_name="extra")
+        pipeline.set_adapters(["layer", "extra"], adapter_weights=[1.0, 0.5])
 
     return pipeline
-
 
 def get_fg_layer_box(list_layer_pt):
     list_layer_box = []
@@ -266,9 +265,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cfg_path", type=str)
     parser.add_argument("--ckpt_dir", type=str)
-    parser.add_argument("--save_dir", type=str)
     parser.add_argument("--transp_vae_ckpt", type=str)
-    parser.add_argument("--fuse_lora_dir", type=str)
+    parser.add_argument("--pre_fuse_lora_dir", type=str)
+    parser.add_argument("--extra_lora_dir", type=str, default=None)
+    parser.add_argument("--save_dir", type=str)
     parser.add_argument("--variant", type=str, default="None")
     parser.add_argument("--cfg", type=float, default=4.0)
     parser.add_argument("--steps", type=int, default=28)

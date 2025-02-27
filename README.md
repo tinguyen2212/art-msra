@@ -66,26 +66,26 @@ python example.py
 
 #### 1. Download Checkpoints
 
-Create a path `multi_layer_gen/pretrained` and download the following pretrained checkpoints into this path.
+Create a path `multi_layer_gen/checkpoints` and download the following checkpoints into this path.
 
 | Variable | Description | Action Required |
 |----------|-------------|-----------------|
 | `ckpt_dir` | Anonymous region transformer checkpoint | Download from [Google Drive](https://drive.google.com/drive/folders/1xKLCCCaI9QBWaJpS83XEgluhxD-gb-Yz?usp=sharing) |
 | `transp_vae_ckpt` | Multi-layer transparency decoder checkpoint | Download from [Google Drive](https://drive.google.com/file/d/1_0erQNUp_LzZAyCiXApCKuIu4xlOo98n/view?usp=sharing) |
-| `fuse_lora_dir` | Optional pretrained LoRA weights | Download from [Google Drive](https://drive.google.com/drive/folders/1GaSNpyNRJ4FhJZxdt-rN_PSPZdzkhFow?usp=sharing) |
+| `pre_fuse_lora_dir` | LoRA weights to be fused initially | Download from [Google Drive](https://drive.google.com/drive/folders/1y15r-GtizmbyE3u8J0isyqSJ17P_ZGro?usp=sharing) |
+| `extra_lora_dir` | Optional LoRA weights (for aesthetic improvement) | Download from [Google Drive](https://drive.google.com/drive/folders/1_503hwaem7WEllVV-5olD5yi1UUiMCZm?usp=sharing) |
 
 The downloaded checkpoints should be organized as follows:
 ```
-pretrained/
+checkpoints/
 ├── anonymous_region_transformer_ckpt/
 │   ├── layer_pe.pth
-│   ├── optimizer.bin
-│   ├── pytorch_lora_weights.safetensors
-│   ├── random_states_0.pkl
-│   └── scheduler.bin
-├── transparent_decoder_ckpt.pt
-└── lora_for_test/
-    └── pytorch_lora_weights.safetensors
+│   └── pytorch_lora_weights.safetensors
+├── extra_lora/
+|   └── pytorch_lora_weights.safetensors
+├── pre_fuse_lora/
+|   └── pytorch_lora_weights.safetensors
+└── transparent_decoder_ckpt.pt
 ```
 
 #### 2. Run the testing Script
@@ -93,22 +93,14 @@ pretrained/
 python multi_layer_gen/test.py \
 --cfg_path=multi_layer_gen/configs/multi_layer_resolution512_test.py \
 --save_dir=multi_layer_gen/output/ \
---ckpt_dir=multi_layer_gen/pretrained/anonymous_region_transformer_ckpt \
---transp_vae_ckpt=multi_layer_gen/pretrained/transparent_decoder_ckpt.pt \
---fuse_lora_dir=multi_layer_gen/pretrained/lora_for_test
+--ckpt_dir=multi_layer_gen/checkpoints/anonymous_region_transformer_ckpt \
+--transp_vae_ckpt=multi_layer_gen/checkpoints/transparent_decoder_ckpt.pt \
+--pre_fuse_lora_dir=multi_layer_gen/checkpoints/pre_fuse_lora \
+--extra_lora_dir=multi_layer_gen/checkpoints/extra_lora
 ```
 
-
-
-
-
-
-
-
-
-
-
-
+#### 3*. A notebook example 
+Please see `test.ipynb`.
 
 
 ## LLM For Layout Planning
