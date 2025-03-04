@@ -70,7 +70,7 @@ args = dict(
     cfg=4.0,
     steps=28,
     seed=41,
-    gpu_id=1,
+    gpu_id=0,
 )
 args = argparse.Namespace(**args)
 
